@@ -1,9 +1,10 @@
 import sys
 import csv
+import List
 
 from pyspark import SparkContext, SparkConf
 from pyspark.sql import SQLContext
-from operator import add
+from operator import add, mul
 
 conf = SparkConf().setAppName("Task2")
 sc = SparkContext(conf=conf)
@@ -17,8 +18,7 @@ outputFile = str(sys.argv[3])
 
 totalNumber = rddLines.count()
 distinctPlaces = findDistinctPlaces(rddLines)
-tweetsPerPlace = rddLines.map(lambda line: line.split('\t')) \
-    .map(lambda line: (line[4], 1)).reduceByKey(add)
+tweetsPerPlace = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add)
 placeTextRDD = placeAndTweetText(rddLines)
 
 def findDistinctPlaces(rddLines):
@@ -35,23 +35,26 @@ def placeAndTweetText(rddLines):
         .flatMapValues(lambda x: x)
     return placeText
 
+def tweetsPerPlace(place):
+    tpp = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add).filter(lambda x: x[0].lower() == place.lower())
+    return tpp.first()[1]
+
 def countPlaceWordProbability(place, word):
     placeWordCount = placeText.filter(lambda line: ((line[0].lower() == place.lower()) and (word.lower() == line[1].lower()))).count()
     prob = placeWordCount / tweetsPerPlace(place)
-    return placeWordCount
+    return prob
 
 def calc(place, tweetText):
     prob = tweetsPerPlace(place) / totalNumber;
-    list = tweetText.split(" ") #[empire, state, building]
-    for word in list:
-        prob = prob * countPlaceWordProbability(place, word)
-
-
+    wordProbRDD = tweetText.flatMap(lambda x: x.split(" ")).map(lambda x: countPlaceWordProbability(place, x))
+    probSum = wordProbRDD.foreach(mul)
+    return probSum
 
 def calculateProbability(distinctPlaces, inputTweet):
-    placeTextRDD.map(lambda placeAndText: (placeAndText[0], countPlaceWord(placeAndText[0], placeAndText[1])))
-    prob = 1;
-    for each place in distinctPlaces:
-        for each word in inputTweet:
-            prob = prob * countPlaceWord(place, word) / tweetsPerPlace(place)
-        prob = prob * tweetsPerPlace(place) / totalNumber
+    test = placeText.map(lambda placeAndText: (placeAndText[0], calc(placeAndText[1], inputTweet)))
+    return test
+    #prob = 1;
+    #for each place in distinctPlaces:
+    #    for each word in inputTweet:
+    #        prob = prob * countPlaceWord(place, word) / tweetsPerPlace(place)
+    #    prob = prob * tweetsPerPlace(place) / totalNumber
