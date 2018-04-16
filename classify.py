@@ -15,11 +15,21 @@ rddLines = rddLines.sample(False, 0.1, 5)
 inputTweet = sc.textFile(str(sys.argv[2]))
 outputFile = str(sys.argv[3])
 
-
 totalNumber = rddLines.count()
 distinctPlaces = findDistinctPlaces(rddLines)
-tweetsPerPlace = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add)
 placeTextRDD = placeAndTweetText(rddLines)
+
+
+def placeAndNumberOfTweets(rddLines):
+    placeAndTweet = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add)
+    return placeAndTweet
+
+def placeInputTweetWords(placeTextRDD, inputTweet):
+    placeTextRDD.map(lambda line: line[0] )
+
+def tweetsPerPlace(place):
+    tpp = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add).filter(lambda x: x[0].lower() == place.lower())
+    return tpp.first()[1]
 
 def findDistinctPlaces(rddLines):
     distinctPlaces = rddLines.map(lambda line: line.split('\t')) \
@@ -35,12 +45,8 @@ def placeAndTweetText(rddLines):
         .flatMapValues(lambda x: x)
     return placeText
 
-def tweetsPerPlace(place):
-    tpp = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add).filter(lambda x: x[0].lower() == place.lower())
-    return tpp.first()[1]
-
 def countPlaceWordProbability(place, word):
-    placeWordCount = placeText.filter(lambda line: ((line[0].lower() == place.lower()) and (word.lower() == line[1].lower()))).count()
+    placeWordCount = placeTextRDD.filter(lambda line: ((line[0].lower() == place.lower()) and (word.lower() == line[1].lower()))).count()
     prob = placeWordCount / tweetsPerPlace(place)
     return prob
 
@@ -51,7 +57,7 @@ def calc(place, tweetText):
     return probSum
 
 def calculateProbability(distinctPlaces, inputTweet):
-    test = placeText.map(lambda placeAndText: (placeAndText[0], calc(placeAndText[1], inputTweet)))
+    test = placeTextRDD.map(lambda placeAndText: (placeAndText[0], calc(placeAndText[1], inputTweet)))
     return test
     #prob = 1;
     #for each place in distinctPlaces:
