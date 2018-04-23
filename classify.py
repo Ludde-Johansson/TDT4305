@@ -25,7 +25,7 @@ def placeAndNumberOfTweets(rddLines):
     return placeAndTweet
 
 def placeInputTweetWords(placeTextRDD, inputTweet):
-    placeTextRDD.map(lambda line: line[0] )
+    inputTweet.flatMap(lambda line: (line, 1))
 
 def tweetsPerPlace(place):
     tpp = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add).filter(lambda x: x[0].lower() == place.lower())
@@ -37,6 +37,37 @@ def findDistinctPlaces(rddLines):
         .distinct()
     return distinctPlaces
 
+def allCitiesInputTweet(distinctPlaces, inputTweet):
+    #Make inputTweet to list
+    inputList = inputTweet.map(lambda x: x.split(' ')).first()
+    #Connect the places with the inputTweet
+    cityInputTweet = distinctPlaces.map(lambda place: (place, inputList))
+    #Splits up the list so it is on the form: (city, word)
+    cityWord = cityInputTweet.flatMapValues(lambda x: x)
+
+    cityWordCount = cityWord.map(lambda x: (x[0], placeWordCount(x[0], x[1])))
+
+    return cityWord
+
+placeTextInputWordsRDD = placeTextRDD.join(cityWord)
+
+testFilter = placeTextInputWordsRDD.filter(lambda x: (x[1][0] == x[1][1]))
+
+testCount = testFilter.map()
+
+cityWord = allCitiesInputTweet(distinctPlaces, inputTweet)
+
+def placeWordCount(place, word):
+    count = placeTextRDD.filter(lambda line: ((line[0].lower() == place.lower()) and (word.lower() == line[1].lower()))).count()
+    return count
+
+def placeInputTweetWordsCount():
+
+
+
+
+
+
 def placeAndTweetText(rddLines):
     placeText = rddLines.map(lambda line: line.split('\t')) \
         .map(lambda line: (line[4], line[10])) \
@@ -45,7 +76,7 @@ def placeAndTweetText(rddLines):
         .flatMapValues(lambda x: x)
     return placeText
 
-def countPlaceWordProbability(place, word):
+def countPlaceWordProbability(place, wordList):
     placeWordCount = placeTextRDD.filter(lambda line: ((line[0].lower() == place.lower()) and (word.lower() == line[1].lower()))).count()
     prob = placeWordCount / tweetsPerPlace(place)
     return prob
