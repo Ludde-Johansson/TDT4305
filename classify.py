@@ -16,9 +16,12 @@ inputTweet = sc.textFile(str(sys.argv[2]))
 outputFile = str(sys.argv[3])
 
 totalNumber = rddLines.count()
+
+
+
+
 distinctPlaces = findDistinctPlaces(rddLines)
 placeTextRDD = placeAndTweetText(rddLines)
-
 
 def placeAndNumberOfTweets(rddLines):
     placeAndTweet = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add)
@@ -44,10 +47,21 @@ def allCitiesInputTweet(distinctPlaces, inputTweet):
     cityInputTweet = distinctPlaces.map(lambda place: (place, inputList))
     #Splits up the list so it is on the form: (city, word)
     cityWord = cityInputTweet.flatMapValues(lambda x: x)
-
-    cityWordCount = cityWord.map(lambda x: (x[0], placeWordCount(x[0], x[1])))
-
     return cityWord
+
+joinedRDD = placeTextRDD.join(cityWord)
+
+filteredRDD = joinedRDD.filter(lambda line: ((" " + line[1][1]+ " ") in line[1][0]))
+
+mappedRDD = filteredRDD.map(lambda line: ((line[0], line[1][1]), 1))
+
+reducedRDD = mappedRDD.reduceByKey(add)
+
+newMappedRDD = reducedRDD.map(lambda line: (line[0][0], (line[0][1], line[1])))
+
+groupedRDD = newMappedRDD.groupByKey()
+
+
 
 placeTextInputWordsRDD = placeTextRDD.join(cityWord)
 
@@ -70,10 +84,7 @@ def placeInputTweetWordsCount():
 
 def placeAndTweetText(rddLines):
     placeText = rddLines.map(lambda line: line.split('\t')) \
-        .map(lambda line: (line[4], line[10])) \
-        .map(lambda x: (x[0], x[1].split(" "))) \
-        .map(lambda y: (y[0], list(set(y[1])))) \
-        .flatMapValues(lambda x: x)
+        .map(lambda line: (line[4], line[10]))
     return placeText
 
 def countPlaceWordProbability(place, wordList):
