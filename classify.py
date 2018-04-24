@@ -21,8 +21,7 @@ def placeAndNumberOfTweets(rddLines):
     placeAndTweet = rddLines.map(lambda line: line.split('\t')).map(lambda line: (line[4], 1)).reduceByKey(add)
     return placeAndTweet
 
-#Transforms the training set to a new RDD containing only the places, and makes
-#it distinct
+#Transforms the training set to a new RDD containing only distinct places and nothing else
 def findDistinctPlaces(rddLines):
     distinctPlaces = rddLines.map(lambda line: line.split('\t')) \
         .map(lambda x: x[4]) \
@@ -40,7 +39,7 @@ def probabilityCalculation(totalNumber, line):
         prob = prob * count / Tc
     return prob
 
-#Connect the words in the inputTweet to all of the places in the
+#Connects the words in the inputTweet to all of the places in the
 #training set, and uses flatMapValues in order to get the words
 #separated
 def allCitiesInputTweet(distinctPlaces, inputTweet):
@@ -59,7 +58,9 @@ def main(argv):
     try:
       opts, args = getopt.getopt(argv,"t:i:o:",["training=","input=","output="])
     except getopt.GetoptError:
+      print("Something went wrong when taking in the file paths!")
       sys.exit(2)
+
     for opt, arg in opts:
         if opt in ('--training'):
             trainingFile = arg
@@ -84,16 +85,17 @@ def main(argv):
     #Joins the two RDDs, giving a RDD with place as key,
     #tweet text and input tweet words are value
     joinedRDD = placeTextRDD.join(cityWord)
-    #Filters out the words that are present in a tweet text from a given place
+    #Filters out tuples where the words from the input tweet text are
+    #not present in the tweet text from the training set
     filteredRDD = joinedRDD.filter(lambda line: ((" " + line[1][1]+ " ").lower() in (line[1][0]).lower()))
     #Transforms the filteredRDD into a new RDD containing the key (place, word) and a value 1
     mappedRDD = filteredRDD.map(lambda line: ((line[0], line[1][1]), 1))
-    #Uses reduceByKey in order to calculate the count of words in the input tweet
+    #Uses reduceByKey in order to calculate how many tweets from each place contains each word in the input tweet
     #from a place
     reducedRDD = mappedRDD.reduceByKey(add)
     #Transforms the RDD and 'removes' the word, as it is no longer needed
     newMappedRDD = reducedRDD.map(lambda line: (line[0][0], line[1]))
-    #Groups the counts in each city in order to make calculations afterwards
+    #Groups the frequency of each word in each city in order to make calculations afterwards
     groupedRDD = newMappedRDD.groupByKey()
     #Transform the values to a list, so it can be calculated
     testMap = groupedRDD.map(lambda x: (x[0], list(x[1])))
@@ -106,13 +108,10 @@ def main(argv):
     placeProb = totalJoinedRDD.map(lambda x: (x[0], probabilityCalculation(totalNumber, x)))
     #Finds the maximum value
     maxPlaceProb = placeProb.takeOrdered(1, key=lambda x: -x[1])
-    print(maxPlaceProb + "       maxPlaceProb")
-    print(type(maxPlaceProb) + "       TYPE")
-    print(type(maxPlaceProb[0]))
     #Checks if there are multiple maximum tuples
-    maxiumumPlaceProb = placeProb.filter(lambda x: (x[1] == maxPlaceProb[1]))
+    maximumPlaceProb = placeProb.filter(lambda x: (x[1] == maxPlaceProb[0][1]))
     #Saves result to the given outputPath
-    maxiumumPlaceProb.coalesce(1).saveAsTextFile(outputPath)
+    maximumPlaceProb.coalesce(1).saveAsTextFile(outputPath)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
