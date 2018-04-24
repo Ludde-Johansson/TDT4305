@@ -9,8 +9,8 @@ conf = SparkConf().setAppName("Task2")
 sc = SparkContext(conf=conf)
 sqlCtx = SQLContext(sc)
 
-rddLines = sc.textFile("C:/Users/Public/geotweets.tsv")
-inputTweet = sc.textFile("C:/Users/Public/task2/TDT4305/halla.txt")
+rddLines = sc.textFile("/Users/Ludvig/Documents/NTNU/BigData/data/geotweets.tsv")
+inputTweet = sc.textFile("/Users/Ludvig/Documents/NTNU/BigData/project/phase2/TDT4305/halla.txt")
 sc.setLogLevel("WARN")
 
 def placeAndTweetText(rddLines):
@@ -29,17 +29,19 @@ def findDistinctPlaces(rddLines):
     return distinctPlaces
 
 def probabilityCalculation(line):
-    T = totalNumber
-    Tc = line[1][0]
+    T = float (totalNumber)
+    Tc = float (line[1][0])
+    #print(type(T))
+    #print(T)
+    #print(Tc)
     wordCountList = line[1][1]
     prob = Tc / T
+    #print(type(prob))
+    #print(prob)
     for count in wordCountList:
         prob = prob * count / Tc
     return prob
 
-totalNumber = rddLines.count()
-distinctPlaces = findDistinctPlaces(rddLines)
-placeTextRDD = placeAndTweetText(rddLines)
 
 def allCitiesInputTweet(distinctPlaces, inputTweet):
     #Make inputTweet to list
@@ -50,9 +52,12 @@ def allCitiesInputTweet(distinctPlaces, inputTweet):
     cityWord = cityInputTweet.flatMapValues(lambda x: x)
     return cityWord
 
+totalNumber = rddLines.count()
+distinctPlaces = findDistinctPlaces(rddLines)
+placeTextRDD = placeAndTweetText(rddLines)
 cityWord = allCitiesInputTweet(distinctPlaces, inputTweet)
 joinedRDD = placeTextRDD.join(cityWord)
-filteredRDD = joinedRDD.filter(lambda line: ((" " + line[1][1]+ " ") in line[1][0]))
+filteredRDD = joinedRDD.filter(lambda line: ((" " + line[1][1]+ " ").lower() in (line[1][0])).lower())
 mappedRDD = filteredRDD.map(lambda line: ((line[0], line[1][1]), 1))
 reducedRDD = mappedRDD.reduceByKey(add)
 newMappedRDD = reducedRDD.map(lambda line: (line[0][0], line[1]))
@@ -64,7 +69,7 @@ placeProb = totalJoinedRDD.map(lambda x: (x[0], probabilityCalculation(x)))
 sortedPlaceProb = placeProb.sortBy(lambda x: -x[1])
 topFive = sortedPlaceProb.take(5)
 
-sortedPlaceProb.coalesce(1).saveAsTextFile("C:/Users/Public/classifyResults.tsv")
+sortedPlaceProb.coalesce(1).saveAsTextFile("/Users/Ludvig/Desktop/legendebiltyareneRTBanken")
 
-for i in topFive:
-    print(i)
+#for i in topFive:
+#   print(i)
